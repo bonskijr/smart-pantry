@@ -2,7 +2,6 @@ import 'dotenv/config';
 import { PrismaClient } from '../src/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
-import { v7 as uuidv7 } from 'uuid';
 
 const { Pool } = pg;
 const connectionString = process.env.DATABASE_URL!;
@@ -16,12 +15,12 @@ async function main() {
   // Let's find or create categories first
   let fruitsCat = await prisma.category.findFirst({ where: { name: 'Fruits' } });
   if (!fruitsCat) {
-    fruitsCat = await prisma.category.create({ data: { id: uuidv7(), name: 'Fruits' } });
+    fruitsCat = await prisma.category.create({ data: { name: 'Fruits' } });
   }
 
   let veggiesCat = await prisma.category.findFirst({ where: { name: 'Vegetables' } });
   if (!veggiesCat) {
-    veggiesCat = await prisma.category.create({ data: { id: uuidv7(), name: 'Vegetables' } });
+    veggiesCat = await prisma.category.create({ data: { name: 'Vegetables' } });
   }
 
   const fruitNames = ['Apple', 'Banana', 'Orange', 'Strawberry', 'Grapes', 'Watermelon', 'Blueberry', 'Peach', 'Pear', 'Cherry', 'Mango', 'Pineapple', 'Kiwi', 'Plum', 'Raspberry', 'Blackberry'];
@@ -39,7 +38,6 @@ async function main() {
     const baseName = baseNames[Math.floor(Math.random() * baseNames.length)];
 
     pantryItems.push({
-      id: uuidv7(),
       name: `${adjective} ${baseName} ${i + 1}`,
       quantity: Math.floor(Math.random() * 20) + 1,
       categoryId: catId,

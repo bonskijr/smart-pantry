@@ -1,23 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import type { PantryItem } from '../types/PantryItem';
 import { useCategories } from '../hooks/useCategories';
+import { ENDPOINTS } from '../config';
 
 interface Category {
-    id: string;
+    id: number;
     name: string;
 }
 
 interface UpdateItemModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onItemUpdated: (updatedItem: PantryItem & { category?: { id: string; name: string } }) => void;
+    onItemUpdated: (updatedItem: PantryItem & { category?: { id: number; name: string } }) => void;
     item: PantryItem | null;
 }
 
 const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onItemUpdated, item }) => {
     const [name, setName] = useState('');
     const [quantity, setQuantity] = useState(1);
-    const [categoryId, setCategoryId] = useState('');
+    const [categoryId, setCategoryId] = useState<number | ''>('');
     const [expirationDate, setExpirationDate] = useState('');
     
     const { categories, fetchCategories, createCategory } = useCategories();
@@ -60,7 +61,7 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
                  throw new Error('Please select a category');
             }
 
-            const response = await fetch(`http://localhost:3000/items/${item.id}`, {
+            const response = await fetch(`${ENDPOINTS.ITEMS}/${item.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -84,7 +85,7 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
             
             let category = categories.find(c => c.id === finalCategoryId);
             if (!category && isNewCategory) {
-                 category = { id: finalCategoryId, name: newCategoryName };
+                 category = { id: finalCategoryId as number, name: newCategoryName };
             }
 
             onItemUpdated({ ...updatedItem, category });
@@ -180,7 +181,7 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
                                     ) : (
                                         <select
                                             value={categoryId}
-                                            onChange={(e) => setCategoryId(e.target.value)}
+                                            onChange={(e) => setCategoryId(Number(e.target.value) || '')}
                                             required={!isNewCategory}
                                             className="w-full bg-white/[0.03] border border-white/5 hover:border-primary/50 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer"
                                         >

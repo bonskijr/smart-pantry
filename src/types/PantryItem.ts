@@ -1,15 +1,15 @@
 export interface Category {
-  id: string;
+  id: number;
   name: string;
 }
 
 export interface PantryItem {
-  id: string;
+  id: number;
   name: string;
   quantity: number;
-  expirationDate?: string | Date | null; // API sends string (ISO), Date obj in app
-  categoryId: string;
-  category?: Category; // Made optional because sometimes we might fetch without it, but usually included
+  expirationDate?: string | Date | null;
+  categoryId: number;
+  category?: Category;
   createdAt: string | Date;
   updatedAt: string | Date;
 }

@@ -6,12 +6,12 @@ global.fetch = vi.fn();
 
 describe('Dashboard', () => {
     const mockItems = [
-        { id: '1', name: 'Fresh Item', quantity: 5, expirationDate: '2026-12-31', categoryId: 'c1', createdAt: '2026-01-01', category: { name: 'Fruits' } },
-        { id: '2', name: 'Expiring Item', quantity: 2, expirationDate: '2026-01-20', categoryId: 'c2', createdAt: '2026-01-01', category: { name: 'Dairy' } }
+        { id: 1, name: 'Fresh Item', quantity: 5, expirationDate: '2026-12-31', categoryId: 10, createdAt: '2026-01-01', category: { name: 'Fruits' } },
+        { id: 2, name: 'Expiring Item', quantity: 2, expirationDate: '2026-01-20', categoryId: 20, createdAt: '2026-01-01', category: { name: 'Dairy' } }
     ];
 
     const mockExpiring = [
-        { id: '2', name: 'Expiring Item', quantity: 2, expirationDate: '2026-01-20', categoryId: 'c2', createdAt: '2026-01-01', category: { name: 'Dairy' } }
+        { id: 2, name: 'Expiring Item', quantity: 2, expirationDate: '2026-01-20', categoryId: 20, createdAt: '2026-01-01', category: { name: 'Dairy' } }
     ];
 
     beforeEach(() => {

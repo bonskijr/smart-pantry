@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ENDPOINTS } from '../config';
 
 interface ImportResult {
     success: number;
@@ -65,7 +66,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onItemsImpor
                 throw new Error('No items found in CSV');
             }
 
-            const response = await fetch('http://localhost:3000/items/bulk', {
+            const response = await fetch(ENDPOINTS.BULK_IMPORT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ items }),

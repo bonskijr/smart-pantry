@@ -53,11 +53,11 @@ describe('AddItemModal', () => {
             })
             .mockResolvedValueOnce({ // 2. POST /categories
                 ok: true,
-                json: async () => ({ id: 'new-cat-id', name: 'New Cat' }),
+                json: async () => ({ id: 100, name: 'New Cat' }),
             })
             .mockResolvedValueOnce({ // 3. POST /items
                 ok: true,
-                json: async () => ({ id: 'item-id', name: 'New Item' }),
+                json: async () => ({ id: 200, name: 'New Item' }),
             });
 
         render(<AddItemModal {...defaultProps} />);
@@ -80,15 +80,15 @@ describe('AddItemModal', () => {
         });
 
         // Verify category creation call
-        expect(global.fetch).toHaveBeenCalledWith('http://localhost:3000/categories', expect.objectContaining({
+        expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/categories'), expect.objectContaining({
             method: 'POST',
             body: JSON.stringify({ name: 'New Cat' })
         }));
 
         // Verify item creation call with new category ID
-        expect(global.fetch).toHaveBeenCalledWith('http://localhost:3000/items', expect.objectContaining({
+        expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/items'), expect.objectContaining({
             method: 'POST',
-            body: expect.stringContaining('"categoryId":"new-cat-id"')
+            body: expect.stringContaining('"categoryId":100')
         }));
 
         expect(defaultProps.onItemAdded).toHaveBeenCalled();
@@ -120,7 +120,7 @@ describe('AddItemModal', () => {
                  ok: true, json: async () => []
             })
             .mockResolvedValueOnce({ // 2. Create Cat
-                 ok: true, json: async () => ({ id: 'c1' })
+                 ok: true, json: async () => ({ id: 50 })
             })
             .mockResolvedValueOnce({ // 3. Create Item Fail
                  ok: false, 

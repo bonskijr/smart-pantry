@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCategories } from '../hooks/useCategories';
+import { ENDPOINTS } from '../config';
 
 interface AddItemModalProps {
     isOpen: boolean;
@@ -60,7 +61,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
                  throw new Error('Please select a category');
             }
 
-            const response = await fetch('http://localhost:3000/items', {
+            const response = await fetch(ENDPOINTS.ITEMS, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

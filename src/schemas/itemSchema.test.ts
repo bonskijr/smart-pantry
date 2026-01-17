@@ -5,7 +5,7 @@ describe('createItemSchema', () => {
     const validItem = {
         name: 'Test Item',
         quantity: 5,
-        categoryId: '550e8400-e29b-41d4-a716-446655440000',
+        categoryId: 1,
         expirationDate: '2026-12-31T00:00:00.000Z',
     };
 
@@ -72,10 +72,10 @@ describe('createItemSchema', () => {
         expect(result.success).toBe(false);
     });
 
-    it('should fail when categoryId is not a valid UUID', () => {
+    it('should fail when categoryId is not a number', () => {
         const result = createItemSchema.safeParse({
             ...validItem,
-            categoryId: 'not-a-uuid',
+            categoryId: 'not-a-number',
         });
         expect(result.success).toBe(false);
         if (!result.success) {
@@ -94,7 +94,7 @@ describe('createItemSchema', () => {
         const baseItem = {
             name: 'Test Item',
             quantity: 5,
-            categoryId: '550e8400-e29b-41d4-a716-446655440000',
+            categoryId: 1,
         };
 
         it('should accept date-only string from HTML date input (YYYY-MM-DD)', () => {
@@ -173,7 +173,7 @@ describe('updateItemSchema', () => {
 
     it('should validate categoryId format when provided', () => {
         const result = updateItemSchema.safeParse({
-            categoryId: 'invalid-uuid',
+            categoryId: 'invalid',
         });
         expect(result.success).toBe(false);
     });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import ItemTable from './ItemTable';
 import StatCard from './StatCard';
 import AddItemModal from './AddItemModal';
@@ -6,6 +6,7 @@ import UpdateItemModal from './UpdateItemModal';
 import ImportModal from './ImportModal';
 import Toast from './Toast';
 import type { PantryItem } from '../types/PantryItem';
+import { ENDPOINTS } from '../config';
 
 const Dashboard: React.FC = () => {
     const [items, setItems] = useState<PantryItem[]>([]);
@@ -16,7 +17,7 @@ const Dashboard: React.FC = () => {
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<PantryItem | null>(null);
-    const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
+    const [highlightedItemId, setHighlightedItemId] = useState<number | null>(null);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     
     // View Mode
@@ -69,8 +70,8 @@ const Dashboard: React.FC = () => {
     const fetchData = useCallback(async () => {
         try {
             const [itemsRes, expiringRes] = await Promise.all([
-                fetch('http://localhost:3000/items'),
-                fetch('http://localhost:3000/expiring')
+                fetch(ENDPOINTS.ITEMS),
+                fetch(ENDPOINTS.EXPIRING)
             ]);
 
             if (!itemsRes.ok || !expiringRes.ok) {
@@ -94,6 +95,29 @@ const Dashboard: React.FC = () => {
         fetchData();
     }, [fetchData]);
 
+    // Determine which items to show based on viewMode
+    const baseItems = viewMode === 'expiring' ? expiringItems : items;
+
+    // Filter Logic (Memoized)
+    const finalDisplayedItems = useMemo(() => {
+        return baseItems.filter(item => {
+            const matchesName = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesCategory = selectedCategory ? item.category?.name === selectedCategory : true;
+            return matchesName && matchesCategory;
+        });
+    }, [baseItems, searchTerm, selectedCategory]);
+
+    // Extract Categories (Memoized)
+    const categories = useMemo(() => {
+        return Array.from(new Set(items.map(i => i.category?.name).filter((n): n is string => !!n))).sort();
+    }, [items]);
+    
+    const filteredCategoryOptions = useMemo(() => {
+        return categories
+            .filter(c => c.toLowerCase().includes(categoryFilter.toLowerCase()))
+            .slice(0, 10);
+    }, [categories, categoryFilter]);
+
     if (loading) {
         return (
             <div className="flex justify-center items-center min-h-screen text-primary">
@@ -111,23 +135,6 @@ const Dashboard: React.FC = () => {
     }
 
     const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-    
-    // Determine which items to show based on viewMode
-    const baseItems = viewMode === 'expiring' ? expiringItems : items;
-
-    // Filter Logic
-    const finalDisplayedItems = baseItems.filter(item => {
-        const matchesName = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCategory = selectedCategory ? item.category?.name === selectedCategory : true;
-        return matchesName && matchesCategory;
-    });
-
-    // Extract Categories
-    const categories = Array.from(new Set(items.map(i => i.category?.name).filter((n): n is string => !!n))).sort();
-    
-    const filteredCategoryOptions = categories
-        .filter(c => c.toLowerCase().includes(categoryFilter.toLowerCase()))
-        .slice(0, 10);
 
     return (
         <div className="min-h-screen">

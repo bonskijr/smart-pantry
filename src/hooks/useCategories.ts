@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
+import { ENDPOINTS } from '../config';
 
 interface Category {
-    id: string;
+    id: number;
     name: string;
 }
 
@@ -11,11 +12,11 @@ export function useCategories() {
 
     const fetchCategories = useCallback(async () => {
         try {
-            const res = await fetch('http://localhost:3000/items');
+            const res = await fetch(ENDPOINTS.ITEMS);
             if (!res.ok) throw new Error('Failed to fetch items');
             const items = await res.json();
             
-            const uniqueCategories = new Map<string, Category>();
+            const uniqueCategories = new Map<number, Category>();
             items.forEach((item: { category: Category }) => {
                 if (item.category) {
                     uniqueCategories.set(item.category.id, item.category);
@@ -30,7 +31,7 @@ export function useCategories() {
 
     const createCategory = useCallback(async (name: string) => {
         try {
-            const res = await fetch('http://localhost:3000/categories', {
+            const res = await fetch(ENDPOINTS.CATEGORIES, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name })

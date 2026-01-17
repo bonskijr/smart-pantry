@@ -5,31 +5,31 @@ import type { PantryItem } from '../types/PantryItem';
 
 const mockItems: PantryItem[] = [
     {
-        id: '1',
+        id: 1,
         name: 'Apples',
         quantity: 10,
-        categoryId: 'cat-1',
-        category: { id: 'cat-1', name: 'Fruits' },
+        categoryId: 1,
+        category: { id: 1, name: 'Fruits' },
         expirationDate: '2026-02-01T00:00:00Z',
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
     },
     {
-        id: '2',
+        id: 2,
         name: 'Bread',
         quantity: 3,
-        categoryId: 'cat-2',
-        category: { id: 'cat-2', name: 'Bakery' },
+        categoryId: 2,
+        category: { id: 2, name: 'Bakery' },
         expirationDate: '2026-01-20T00:00:00Z',
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
     },
     {
-        id: '3',
+        id: 3,
         name: 'Milk',
         quantity: 2,
-        categoryId: 'cat-3',
-        category: { id: 'cat-3', name: 'Dairy' },
+        categoryId: 3,
+        category: { id: 3, name: 'Dairy' },
         expirationDate: null,
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
@@ -114,10 +114,9 @@ describe('ItemTable', () => {
     });
 
     it('applies highlight styling when highlightedItemId matches', () => {
-        const { container } = render(
-            <ItemTable {...defaultProps} highlightedItemId="1" />
-        );
-        expect(container.querySelector('.bg-primary\\/20')).toBeInTheDocument();
+        render(<ItemTable {...defaultProps} highlightedItemId={1} />);
+        const row = screen.getByText('Apples').closest('tr');
+        expect(row).toHaveClass('bg-primary/20');
     });
 
     it('renders table headers correctly', () => {
@@ -131,11 +130,11 @@ describe('ItemTable', () => {
 
 describe('ItemTable Pagination', () => {
     const manyItems: PantryItem[] = Array.from({ length: 12 }, (_, i) => ({
-        id: `item-${i + 1}`,
+        id: i + 1,
         name: `Item ${i + 1}`,
         quantity: 10,
-        categoryId: 'cat-1',
-        category: { id: 'cat-1', name: 'Test Category' },
+        categoryId: 1,
+        category: { id: 1, name: 'Test Category' },
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
     }));

@@ -21,7 +21,7 @@ const dateStringValidator = z.string().refine(
 export const createItemSchema = z.object({
   name: z.string().min(1, "Name is required"),
   quantity: z.number().int().nonnegative("Quantity must be a non-negative integer"),
-  categoryId: z.string().uuid("Category ID must be a valid UUID"),
+  categoryId: z.number().int("Category ID must be a valid integer"),
   expirationDate: dateStringValidator.optional().nullable().or(z.date().optional().nullable())
 });
 
