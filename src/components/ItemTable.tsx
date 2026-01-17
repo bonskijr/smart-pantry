@@ -114,8 +114,7 @@ const ItemTable: React.FC<ItemTableProps> = ({ items, onEdit, onAdd, onImport, h
                                     </td>
                                     <td className="px-6 py-5">
                                         <span className="bg-white/5 text-gray-300 py-1.5 px-4 rounded-lg text-xs font-semibold ring-1 ring-white/10 group-hover:ring-primary/40 transition-all border border-transparent group-hover:border-primary/20">
-                                            {/* @ts-ignore */}
-                                            {(item as any).category?.name || 'Uncategorized'}
+                                            {item.category?.name || 'Uncategorized'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-5">

@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-interface Category {
-    id: string;
-    name: string;
-}
+import { useCategories } from '../hooks/useCategories';
 
 interface AddItemModalProps {
     isOpen: boolean;
@@ -16,70 +12,91 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
     const [quantity, setQuantity] = useState(1);
     const [categoryId, setCategoryId] = useState('');
     const [expirationDate, setExpirationDate] = useState('');
-    const [categories, setCategories] = useState<Category[]>([]);
+    
+    const { categories, fetchCategories, createCategory } = useCategories();
+    
+    // New Category State
+    const [isNewCategory, setIsNewCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+    const resetForm = () => {
+        setName('');
+        setQuantity(1);
+        setCategoryId('');
+        setExpirationDate('');
+        setIsNewCategory(false);
+        setNewCategoryName('');
+    };
 
     useEffect(() => {
         if (isOpen) {
             setSuccessMessage(null);
             setError(null);
-            // Fetch categories from items to get unique categories
-            fetch('http://localhost:3000/items')
-                .then(res => res.json())
-                .then(items => {
-                    const uniqueCategories = new Map<string, Category>();
-                    items.forEach((item: { category: Category }) => {
-                        if (item.category) {
-                            uniqueCategories.set(item.category.id, item.category);
-                        }
-                    });
-                    setCategories(Array.from(uniqueCategories.values()));
-                })
-                .catch(err => console.error('Failed to fetch categories:', err));
+            resetForm();
+            fetchCategories();
         }
-    }, [isOpen]);
+    }, [isOpen, fetchCategories]);
 
-    const handleSubmit = async (e: React.FormEvent, shouldClose: boolean = true) => {
+    const handleSubmit = async (e: React.SyntheticEvent, shouldClose: boolean = true) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
         setSuccessMessage(null);
 
         try {
+            let finalCategoryId = categoryId;
+
+            if (isNewCategory) {
+                if (!newCategoryName.trim()) {
+                    throw new Error('Category name is required');
+                }
+                finalCategoryId = await createCategory(newCategoryName);
+            } else if (!categoryId) {
+                 // Should be caught by required attribute but good to have
+                 throw new Error('Please select a category');
+            }
+
             const response = await fetch('http://localhost:3000/items', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name,
                     quantity,
-                    categoryId,
+                    categoryId: finalCategoryId,
                     expirationDate: expirationDate || null,
                 }),
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to create item');
+                let errMsg = errorData.error || 'Failed to create item';
+                if (typeof errMsg === 'object') {
+                    errMsg = JSON.stringify(errMsg);
+                }
+                throw new Error(errMsg);
             }
 
             onItemAdded();
+            
+            if (isNewCategory) {
+                setIsNewCategory(false);
+                setNewCategoryName('');
+            }
 
             if (shouldClose) {
-                // Reset form and close modal
-                setName('');
-                setQuantity(1);
-                setCategoryId('');
-                setExpirationDate('');
+                resetForm();
                 onClose();
             } else {
                 // Keep open, show success, and reset form
                 setName('');
                 setQuantity(1);
                 setExpirationDate('');
+                
                 setSuccessMessage(`${name} added successfully!`);
-                // Clear success message after 3 seconds
                 setTimeout(() => setSuccessMessage(null), 3000);
             }
         } catch (err) {
@@ -156,20 +173,45 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
                                 </div>
 
                                 <div>
-                                    <label className="block text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest mb-1.5 ml-1">Category</label>
-                                    <select
-                                        value={categoryId}
-                                        onChange={(e) => setCategoryId(e.target.value)}
-                                        required
-                                        className="w-full bg-white/[0.03] border border-white/5 hover:border-primary/50 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer"
-                                    >
-                                        <option value="" className="bg-surface">Select</option>
-                                        {categories.map((cat) => (
-                                            <option key={cat.id} value={cat.id} className="bg-surface">
-                                                {cat.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div className="flex justify-between items-center mb-1.5 ml-1">
+                                        <label className="block text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest">Category</label>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => {
+                                                setIsNewCategory(!isNewCategory);
+                                                setNewCategoryName('');
+                                                setCategoryId('');
+                                            }}
+                                            className="text-[0.65rem] text-primary hover:text-white transition-colors uppercase font-bold tracking-wider"
+                                        >
+                                            {isNewCategory ? 'Select Existing' : 'Create New'}
+                                        </button>
+                                    </div>
+                                    
+                                    {isNewCategory ? (
+                                        <input
+                                            type="text"
+                                            value={newCategoryName}
+                                            onChange={(e) => setNewCategoryName(e.target.value)}
+                                            required={isNewCategory}
+                                            placeholder="New Category Name"
+                                            className="w-full bg-white/[0.03] border border-white/5 hover:border-primary/50 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all placeholder:text-gray-600"
+                                        />
+                                    ) : (
+                                        <select
+                                            value={categoryId}
+                                            onChange={(e) => setCategoryId(e.target.value)}
+                                            required={!isNewCategory}
+                                            className="w-full bg-white/[0.03] border border-white/5 hover:border-primary/50 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer"
+                                        >
+                                            <option value="" className="bg-surface">Select</option>
+                                            {categories.map((cat) => (
+                                                <option key={cat.id} value={cat.id} className="bg-surface">
+                                                    {cat.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
                                 </div>
                             </div>
 
@@ -203,8 +245,8 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdde
                             </div>
                             <button
                                 type="button"
-                                onClick={(e) => handleSubmit(e as any, false)}
-                                disabled={loading || !name || !categoryId}
+                                onClick={(e) => handleSubmit(e, false)}
+                                disabled={loading || !name || (!categoryId && !newCategoryName)}
                                 className="w-full py-3 rounded-xl border border-primary/30 text-primary hover:bg-primary/10 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Add & Add Another

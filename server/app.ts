@@ -6,6 +6,7 @@ import { PrismaClient } from '../src/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { v7 as uuidv7 } from 'uuid';
+import { createItemSchema, updateItemSchema, categorySchema } from '../src/schemas/itemSchema';
 
 const app = express();
 const connectionString = process.env.DATABASE_URL!;
@@ -34,11 +35,13 @@ app.get('/items', async (req, res) => {
 // POST /items
 app.post('/items', async (req, res) => {
     try {
-        const { name, quantity, categoryId, expirationDate } = req.body;
+        const validation = createItemSchema.safeParse(req.body);
 
-        if (!name || !quantity || !categoryId) {
-            return res.status(400).json({ error: 'Missing required fields' });
+        if (!validation.success) {
+            return res.status(400).json({ error: validation.error.format() });
         }
+
+        const { name, quantity, categoryId, expirationDate } = validation.data;
 
         const item = await prisma.pantryItem.create({
             data: {
@@ -48,6 +51,7 @@ app.post('/items', async (req, res) => {
                 categoryId,
                 expirationDate: expirationDate ? new Date(expirationDate) : null,
             },
+            include: { category: true } // Include category to match GET response structure
         });
         res.json(item);
     } catch (error) {
@@ -60,11 +64,13 @@ app.post('/items', async (req, res) => {
 app.put('/items/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, quantity, categoryId, expirationDate } = req.body;
+        const validation = updateItemSchema.safeParse(req.body);
 
-        if (!name || !quantity || !categoryId) {
-            return res.status(400).json({ error: 'Missing required fields' });
+        if (!validation.success) {
+            return res.status(400).json({ error: validation.error.format() });
         }
+
+        const { name, quantity, categoryId, expirationDate } = validation.data;
 
         const item = await prisma.pantryItem.update({
             where: { id },
@@ -74,6 +80,7 @@ app.put('/items/:id', async (req, res) => {
                 categoryId,
                 expirationDate: expirationDate ? new Date(expirationDate) : null,
             },
+            include: { category: true }
         });
         res.json(item);
     } catch (error) {
@@ -85,17 +92,15 @@ app.put('/items/:id', async (req, res) => {
 // GET /expiring
 app.get('/expiring', async (req, res) => {
     try {
-        const today = new Date();
+        const now = new Date();
         const nextWeek = new Date();
-        nextWeek.setDate(today.getDate() + 7);
+        nextWeek.setDate(now.getDate() + 7);
 
         const items = await prisma.pantryItem.findMany({
             where: {
                 expirationDate: {
+                    gte: now, // Exclude expired
                     lte: nextWeek,
-                    // You might want to filter out already expired items or keep them?
-                    // "Expiring" usually implies not yet expired or recently expired.
-                    // Let's just return anything expiring <= 7 days from now.
                 }
             },
             include: { category: true },
@@ -108,6 +113,50 @@ app.get('/expiring', async (req, res) => {
     }
 });
 
+// POST /categories
+app.post('/categories', async (req, res) => {
+    try {
+        const validation = categorySchema.safeParse(req.body);
+        if (!validation.success) {
+            return res.status(400).json({ error: validation.error.format() });
+        }
+        
+        const { name } = validation.data;
+
+        // 1. Try to find existing (Case Insensitive)
+        const existing = await prisma.category.findFirst({
+            where: { name: { equals: name, mode: 'insensitive' } }
+        });
+
+        if (existing) {
+            return res.json(existing);
+        }
+
+        try {
+            // 2. Optimistic Create
+            const category = await prisma.category.create({
+                data: {
+                    id: uuidv7(),
+                    name
+                }
+            });
+            res.json(category);
+        } catch (e: any) {
+             // 3. Handle Race Condition (Unique Constraint Violation)
+            if (e.code === 'P2002') {
+                 const retryExisting = await prisma.category.findFirst({
+                    where: { name: { equals: name, mode: 'insensitive' } }
+                });
+                return res.json(retryExisting);
+            }
+            throw e;
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to create category' });
+    }
+});
+
 // POST /items/bulk
 app.post('/items/bulk', async (req, res) => {
     try {
@@ -116,64 +165,81 @@ app.post('/items/bulk', async (req, res) => {
             return res.status(400).json({ error: 'Items must be an array' });
         }
 
-        const results = {
-            success: 0,
-            failed: 0,
-            errors: [] as { item: any; reason: string }[],
-            importedItems: [] as any[],
-        };
+        const validItems: any[] = [];
+        const uniqueCategoryNames = new Set<string>();
+        const errors: { item: any; reason: string }[] = [];
 
-        for (const itemData of items) {
-            try {
-                const { name, quantity, categoryName, expirationDate } = itemData;
-
-                if (!name || !quantity || !categoryName) {
-                    results.failed++;
-                    results.errors.push({ item: itemData, reason: 'Missing required fields (name, quantity, or categoryName)' });
-                    continue;
-                }
-
-                const parsedQuantity = parseInt(quantity);
-                if (isNaN(parsedQuantity)) {
-                    results.failed++;
-                    results.errors.push({ item: itemData, reason: 'Invalid quantity' });
-                    continue;
-                }
-
-                // Find or create category by name
-                let category = await prisma.category.findFirst({
-                    where: { name: { equals: categoryName, mode: 'insensitive' } },
-                });
-
-                if (!category) {
-                    category = await prisma.category.create({
-                        data: {
-                            id: uuidv7(),
-                            name: categoryName
-                        },
-                    });
-                }
-
-                const newItem = await prisma.pantryItem.create({
-                    data: {
-                        id: uuidv7(),
-                        name,
-                        quantity: parsedQuantity,
-                        categoryId: category.id,
-                        expirationDate: expirationDate ? new Date(expirationDate) : null,
-                    },
-                    include: { category: true },
-                });
-
-                results.success++;
-                results.importedItems.push(newItem);
-            } catch (err) {
-                results.failed++;
-                results.errors.push({ item: itemData, reason: err instanceof Error ? err.message : 'Unknown error' });
+        // 1. PREPARE: Validation loop
+        for (const item of items) {
+            const { name, quantity, categoryName } = item;
+            if (!name || !quantity || !categoryName) {
+                errors.push({ item, reason: 'Missing required fields' });
+                continue;
             }
+            const parsedQty = parseInt(quantity);
+            if (isNaN(parsedQty)) {
+                errors.push({ item, reason: 'Invalid quantity' });
+                continue;
+            }
+            
+            uniqueCategoryNames.add(categoryName); 
+            validItems.push({ ...item, parsedQty });
         }
 
-        res.json(results);
+        if (validItems.length === 0) {
+            return res.json({ success: 0, failed: errors.length, errors, importedItems: [] });
+        }
+
+        // 2. RESOLVE CATEGORIES: Fetch existing only (No creation)
+        const categoryNamesArray = Array.from(uniqueCategoryNames);
+
+        const existingCategories = await prisma.category.findMany({
+            where: {
+                name: { in: categoryNamesArray, mode: 'insensitive' }
+            }
+        });
+
+        // Create Lookup Map: Lowercase Name -> ID
+        const categoryMap = new Map<string, string>();
+        existingCategories.forEach(cat => categoryMap.set(cat.name.toLowerCase(), cat.id));
+
+        // 3. PREPARE PAYLOAD & FILTER MISSING CATEGORIES
+        const itemsToCreate: any[] = [];
+
+        for (const item of validItems) {
+            const catId = categoryMap.get(item.categoryName.toLowerCase());
+            
+            if (!catId) {
+                errors.push({ 
+                    item, 
+                    reason: `Category '${item.categoryName}' does not exist. Please create it first.` 
+                });
+                continue;
+            }
+
+            itemsToCreate.push({
+                id: uuidv7(),
+                name: item.name,
+                quantity: item.parsedQty,
+                categoryId: catId,
+                expirationDate: item.expirationDate ? new Date(item.expirationDate) : null,
+            });
+        }
+
+        if (itemsToCreate.length > 0) {
+             // 4. BATCH INSERT
+            await prisma.pantryItem.createMany({
+                data: itemsToCreate
+            });
+        }
+
+        res.json({
+            success: itemsToCreate.length,
+            failed: errors.length,
+            errors,
+            importedItems: itemsToCreate
+        });
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to bulk import items' });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { PantryItem } from '../types/PantryItem';
+import { useCategories } from '../hooks/useCategories';
 
 interface Category {
     id: string;
@@ -18,7 +19,13 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
     const [quantity, setQuantity] = useState(1);
     const [categoryId, setCategoryId] = useState('');
     const [expirationDate, setExpirationDate] = useState('');
-    const [categories, setCategories] = useState<Category[]>([]);
+    
+    const { categories, fetchCategories, createCategory } = useCategories();
+    
+    // New Category State
+    const [isNewCategory, setIsNewCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -28,22 +35,11 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
             setQuantity(item.quantity);
             setCategoryId(item.categoryId);
             setExpirationDate(item.expirationDate ? new Date(item.expirationDate).toISOString().split('T')[0] : '');
-
-            // Fetch categories
-            fetch('http://localhost:3000/items')
-                .then(res => res.json())
-                .then(items => {
-                    const uniqueCategories = new Map<string, Category>();
-                    items.forEach((i: { category: Category }) => {
-                        if (i.category) {
-                            uniqueCategories.set(i.category.id, i.category);
-                        }
-                    });
-                    setCategories(Array.from(uniqueCategories.values()));
-                })
-                .catch(err => console.error('Failed to fetch categories:', err));
+            setIsNewCategory(false);
+            setNewCategoryName('');
+            fetchCategories();
         }
-    }, [isOpen, item]);
+    }, [isOpen, item, fetchCategories]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -53,24 +49,44 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
         setError(null);
 
         try {
+            let finalCategoryId = categoryId;
+
+            if (isNewCategory) {
+                 if (!newCategoryName.trim()) {
+                     throw new Error('Category name is required');
+                 }
+                 finalCategoryId = await createCategory(newCategoryName);
+            } else if (!categoryId) {
+                 throw new Error('Please select a category');
+            }
+
             const response = await fetch(`http://localhost:3000/items/${item.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name,
                     quantity,
-                    categoryId,
+                    categoryId: finalCategoryId,
                     expirationDate: expirationDate || null,
                 }),
             });
 
             if (!response.ok) {
-                throw new Error('Failed to update item');
+                const errorData = await response.json();
+                let errMsg = errorData.error || 'Failed to update item';
+                if (typeof errMsg === 'object') {
+                    errMsg = JSON.stringify(errMsg);
+                }
+                throw new Error(errMsg);
             }
 
             const updatedItem = await response.json();
-            // Find the category from our cached categories
-            const category = categories.find(c => c.id === categoryId);
+            
+            let category = categories.find(c => c.id === finalCategoryId);
+            if (!category && isNewCategory) {
+                 category = { id: finalCategoryId, name: newCategoryName };
+            }
+
             onItemUpdated({ ...updatedItem, category });
             onClose();
         } catch (err) {
@@ -137,20 +153,45 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
                                 </div>
 
                                 <div>
-                                    <label className="block text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest mb-1.5 ml-1">Category</label>
-                                    <select
-                                        value={categoryId}
-                                        onChange={(e) => setCategoryId(e.target.value)}
-                                        required
-                                        className="w-full bg-white/[0.03] border border-white/5 hover:border-primary/50 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer"
-                                    >
-                                        <option value="" className="bg-surface">Select</option>
-                                        {categories.map((cat) => (
-                                            <option key={cat.id} value={cat.id} className="bg-surface">
-                                                {cat.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div className="flex justify-between items-center mb-1.5 ml-1">
+                                        <label className="block text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest">Category</label>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => {
+                                                setIsNewCategory(!isNewCategory);
+                                                setNewCategoryName('');
+                                                setCategoryId('');
+                                            }}
+                                            className="text-[0.65rem] text-primary hover:text-white transition-colors uppercase font-bold tracking-wider"
+                                        >
+                                            {isNewCategory ? 'Select Existing' : 'Create New'}
+                                        </button>
+                                    </div>
+                                    
+                                    {isNewCategory ? (
+                                        <input
+                                            type="text"
+                                            value={newCategoryName}
+                                            onChange={(e) => setNewCategoryName(e.target.value)}
+                                            required={isNewCategory}
+                                            placeholder="New Category Name"
+                                            className="w-full bg-white/[0.03] border border-white/5 hover:border-primary/50 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all placeholder:text-gray-600"
+                                        />
+                                    ) : (
+                                        <select
+                                            value={categoryId}
+                                            onChange={(e) => setCategoryId(e.target.value)}
+                                            required={!isNewCategory}
+                                            className="w-full bg-white/[0.03] border border-white/5 hover:border-primary/50 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer"
+                                        >
+                                            <option value="" className="bg-surface">Select</option>
+                                            {categories.map((cat) => (
+                                                <option key={cat.id} value={cat.id} className="bg-surface">
+                                                    {cat.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
                                 </div>
                             </div>
 

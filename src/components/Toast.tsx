@@ -12,12 +12,19 @@ const Toast: React.FC<ToastProps> = ({ message, isVisible, onClose, type = 'succ
 
     useEffect(() => {
         if (isVisible) {
-            setIsShowing(true);
+            // Small delay to allow mounting in hidden state first for transition
+            const showTimer = setTimeout(() => setIsShowing(true), 50);
+            
             const timer = setTimeout(() => {
                 setIsShowing(false);
                 setTimeout(onClose, 300); // Wait for fade out animation
             }, 3000);
-            return () => clearTimeout(timer);
+            return () => {
+                clearTimeout(showTimer);
+                clearTimeout(timer);
+            };
+        } else {
+            setIsShowing(false);
         }
     }, [isVisible, onClose]);
 

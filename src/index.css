@@ -62,31 +62,33 @@ body {
 
 .tooltip-text {
   visibility: hidden;
-  width: 90px;
+  width: max-content;
+  max-width: 120px;
   background-color: #1f2937;
   color: #fff;
   text-align: center;
-  border-radius: 6px;
-  padding: 6px 0;
+  border-radius: 8px;
+  padding: 8px 12px;
   position: absolute;
-  z-index: 50;
-  bottom: 125%;
+  z-index: 100;
+  bottom: calc(100% + 10px);
   left: 50%;
-  margin-left: -45px;
+  transform: translateX(-50%);
   opacity: 0;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 500;
   text-transform: none;
   pointer-events: none;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
 }
 
 .tooltip-container:hover .tooltip-text {
   visibility: visible;
   opacity: 1;
-  transform: translateY(-4px);
+  transform: translateX(-50%) translateY(-4px);
 }
 
 .tooltip-text::after {
@@ -94,7 +96,7 @@ body {
   position: absolute;
   top: 100%;
   left: 50%;
-  margin-left: -5px;
+  transform: translateX(-50%);
   border-width: 5px;
   border-style: solid;
   border-color: #1f2937 transparent transparent transparent;
@@ -103,7 +105,7 @@ body {
 /* Bottom positioned tooltip */
 .tooltip-bottom {
   bottom: auto !important;
-  top: 125%;
+  top: calc(100% + 10px);
 }
 
 .tooltip-bottom::after {
@@ -113,5 +115,5 @@ body {
 }
 
 .tooltip-container:hover .tooltip-bottom.tooltip-text {
-  transform: translateY(4px);
+  transform: translateX(-50%) translateY(4px);
 }
