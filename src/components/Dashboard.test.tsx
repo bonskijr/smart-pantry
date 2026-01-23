@@ -6,12 +6,12 @@ global.fetch = vi.fn();
 
 describe('Dashboard', () => {
     const mockItems = [
-        { id: 1, name: 'Fresh Item', quantity: 5, expirationDate: '2026-12-31', categoryId: 10, createdAt: '2026-01-01', category: { name: 'Fruits' } },
-        { id: 2, name: 'Expiring Item', quantity: 2, expirationDate: '2026-01-20', categoryId: 20, createdAt: '2026-01-01', category: { name: 'Dairy' } }
+        { id: 1, name: 'Fresh Item', quantity: 5, expirationDate: '2026-12-31', categoryId: 10, createdAt: '2026-01-01', category: { id: 10, name: 'Fruits' } },
+        { id: 2, name: 'Expiring Item', quantity: 2, expirationDate: '2026-01-20', categoryId: 20, createdAt: '2026-01-01', category: { id: 20, name: 'Dairy' } }
     ];
 
     const mockExpiring = [
-        { id: 2, name: 'Expiring Item', quantity: 2, expirationDate: '2026-01-20', categoryId: 20, createdAt: '2026-01-01', category: { name: 'Dairy' } }
+        { id: 2, name: 'Expiring Item', quantity: 2, expirationDate: '2026-01-20', categoryId: 20, createdAt: '2026-01-01', category: { id: 20, name: 'Dairy' } }
     ];
 
     beforeEach(() => {
@@ -19,6 +19,15 @@ describe('Dashboard', () => {
         // Dashboard fetches /items and /expiring in parallel
         (global.fetch as any).mockImplementation((url: string) => {
             if (url.includes('/items')) {
+                // Return filtered items if categories param exists
+                // The test asks for Dairy (id 20)
+                if (url.includes('categories=20')) {
+                    return Promise.resolve({
+                        ok: true,
+                        json: async () => [mockItems[1]], // Return only Dairy item
+                    });
+                }
+
                 return Promise.resolve({
                     ok: true,
                     json: async () => mockItems,
@@ -109,7 +118,7 @@ describe('Dashboard', () => {
         fireEvent.click(option);
 
         // Check filter applied
-        expect(screen.getByText('Expiring Item')).toBeInTheDocument();
-        expect(screen.queryByText('Fresh Item')).not.toBeInTheDocument();
+        await waitFor(() => expect(screen.getByText('Expiring Item')).toBeInTheDocument());
+        await waitFor(() => expect(screen.queryByText('Fresh Item')).not.toBeInTheDocument());
     });
 });

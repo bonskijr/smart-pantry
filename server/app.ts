@@ -19,7 +19,25 @@ app.use(express.json());
 // GET /items
 app.get('/items', async (req, res) => {
     try {
+        const { categories } = req.query;
+        let where: any = {};
+
+        if (categories) {
+            const catIds = (categories as string).split(',');
+            if (catIds.length > 3) {
+                return res.status(400).json({ error: 'Cannot filter by more than 3 categories' });
+            }
+            
+            // Validate IDs are numbers
+            const ids = catIds.map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+            
+            if (ids.length > 0) {
+                 where.categoryId = { in: ids };
+            }
+        }
+
         const items = await prisma.pantryItem.findMany({
+            where,
             include: { category: true },
             orderBy: { createdAt: 'asc' },
         });

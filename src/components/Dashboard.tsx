@@ -26,7 +26,7 @@ const Dashboard: React.FC = () => {
     // Search & Filter State
     const [searchTerm, setSearchTerm] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [selectedCategories, setSelectedCategories] = useState<{id: number, name: string}[]>([]);
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
     const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -69,8 +69,15 @@ const Dashboard: React.FC = () => {
 
     const fetchData = useCallback(async () => {
         try {
+            // Build query params for items if categories are selected
+            let itemsUrl = ENDPOINTS.ITEMS;
+            if (selectedCategories.length > 0) {
+                const catIds = selectedCategories.map(c => c.id).join(',');
+                itemsUrl += `?categories=${catIds}`;
+            }
+
             const [itemsRes, expiringRes] = await Promise.all([
-                fetch(ENDPOINTS.ITEMS),
+                fetch(itemsUrl), // Use local dynamic URL
                 fetch(ENDPOINTS.EXPIRING)
             ]);
 
@@ -89,7 +96,7 @@ const Dashboard: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [selectedCategories]); // Add selectedCategories to dependencies to refetch on change
 
     useEffect(() => {
         fetchData();
@@ -102,21 +109,61 @@ const Dashboard: React.FC = () => {
     const finalDisplayedItems = useMemo(() => {
         return baseItems.filter(item => {
             const matchesName = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesCategory = selectedCategory ? item.category?.name === selectedCategory : true;
+            // No need to client-side filter categories for the main list since the API does it,
+            // but we might need it for "expiring" or if we want to be safe. 
+            // Since we fetch specific categories, we can trust the API, OR filter again.
+            // Let's rely on the API for the main list, but for 'expiring' we fetched ALL expiring.
+            // So we SHOULD client-side filter 'expiring' view if we want consistency, 
+            // OR fetch expiring with filters too. 
+            
+            // Current approach: Main list is server-filtered. Expiring list is ALL expiring.
+            // If user selects category, they probably expect expiring view to also filter.
+            
+            let matchesCategory = true;
+            if (selectedCategories.length > 0) {
+                 matchesCategory = selectedCategories.some(c => c.id === item.category?.id);
+            }
+            
             return matchesName && matchesCategory;
         });
-    }, [baseItems, searchTerm, selectedCategory]);
+    }, [baseItems, searchTerm, selectedCategories]);
 
     // Extract Categories (Memoized)
-    const categories = useMemo(() => {
-        return Array.from(new Set(items.map(i => i.category?.name).filter((n): n is string => !!n))).sort();
-    }, [items]);
+    // We need to fetch ALL items to get ALL categories for the dropdown, 
+    // or separate category fetch. Currently we extract from loaded items.
+    // If we filter items by category 1, we only see category 1 in the list.
+    // So we can't extract all categories from the *filtered* items list if we want to show others.
+    // ISSUE: Dropdown options disappear when filter is active if we derive from `items`.
+    // SOLUTION: We should probably fetch categories separately or use a separate "all items" fetch for metadata.
+    // For now, to keep it simple and consistent with previous code, we will derive from the *initial* load or 
+    // we accept that options narrow down.
+    // BETTER: Let's assume for now we might lose options if we strictly rely on `items`.
+    // However, `useCategories` hook logic existed elsewhere.
+    // Let's implement a separate category fetch to ensure the dropdown always has options.
+    
+    const [allCategories, setAllCategories] = useState<{id: number, name: string}[]>([]);
+
+    useEffect(() => {
+        // Fetch all categories once for the dropdown
+        fetch(ENDPOINTS.ITEMS) // This fetches ALL by default (no params)
+            .then(res => res.json())
+            .then(data => {
+                const unique = new Map<number, {id: number, name: string}>();
+                data.forEach((i: any) => {
+                    if (i.category) unique.set(i.category.id, i.category);
+                });
+                setAllCategories(Array.from(unique.values()).sort((a, b) => a.name.localeCompare(b.name)));
+            })
+            .catch(console.error);
+    }, []); // Run once on mount
+
     
     const filteredCategoryOptions = useMemo(() => {
-        return categories
-            .filter(c => c.toLowerCase().includes(categoryFilter.toLowerCase()))
+        return allCategories
+            .filter(c => c.name.toLowerCase().includes(categoryFilter.toLowerCase()))
+            .filter(c => !selectedCategories.some(sc => sc.id === c.id))
             .slice(0, 10);
-    }, [categories, categoryFilter]);
+    }, [allCategories, categoryFilter, selectedCategories]);
 
     if (loading) {
         return (
@@ -162,9 +209,9 @@ const Dashboard: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                     {/* Combined Stats Banner (Spans 2 columns) */}
                     <div 
-                        onClick={() => { setViewMode('all'); setSelectedCategory(null); setSearchTerm(''); }}
+                        onClick={() => { setViewMode('all'); setSelectedCategories([]); setSearchTerm(''); }}
                         className={`col-span-1 md:col-span-2 glass-panel p-6 rounded-2xl relative overflow-hidden group transition-all duration-300
-                            ${viewMode === 'all' && !selectedCategory && !searchTerm ? 'ring-1 ring-primary/30 bg-white/[0.03]' : 'hover:bg-white/[0.04] cursor-pointer'}
+                            ${viewMode === 'all' && selectedCategories.length === 0 && !searchTerm ? 'ring-1 ring-primary/30 bg-white/[0.03]' : 'hover:bg-white/[0.04] cursor-pointer'}
                         `}
                     >
                         {/* Ambient Background Glows */}
@@ -225,9 +272,9 @@ const Dashboard: React.FC = () => {
                             <h2 className="text-2xl font-bold text-white tracking-tight">
                                 {viewMode === 'expiring' ? 'Expiring Items' : 'Active Inventory'}
                             </h2>
-                            {(viewMode === 'expiring' || selectedCategory || searchTerm) && (
+                            {(viewMode === 'expiring' || selectedCategories.length > 0 || searchTerm) && (
                                 <button 
-                                    onClick={() => { setViewMode('all'); setSelectedCategory(null); setSearchTerm(''); setCategoryFilter(''); }}
+                                    onClick={() => { setViewMode('all'); setSelectedCategories([]); setSearchTerm(''); setCategoryFilter(''); }}
                                     className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-full transition-colors"
                                 >
                                     Clear Filters
@@ -263,43 +310,35 @@ const Dashboard: React.FC = () => {
                                     </div>
                                     <input
                                         type="text"
-                                        placeholder="Filter by category..."
-                                        value={selectedCategory || categoryFilter}
+                                        placeholder={selectedCategories.length >= 3 ? "Max 3 categories selected" : "Filter by category..."}
+                                        value={categoryFilter}
+                                        disabled={selectedCategories.length >= 3}
                                         onChange={(e) => {
                                             setCategoryFilter(e.target.value);
-                                            setSelectedCategory(null); // Clear selection when typing
                                             setIsCategoryDropdownOpen(true);
                                         }}
                                         onFocus={() => setIsCategoryDropdownOpen(true)}
-                                        className={`w-full sm:w-64 pl-10 pr-4 py-2 bg-white/[0.03] border border-white/5 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-all text-sm ${selectedCategory ? 'text-primary font-semibold' : ''}`}
+                                        className={`w-full sm:w-64 pl-10 pr-4 py-2 bg-white/[0.03] border border-white/5 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed`}
                                     />
-                                    {selectedCategory && (
-                                        <button 
-                                            onClick={() => { setSelectedCategory(null); setCategoryFilter(''); }}
-                                            className="absolute inset-y-0 right-2 flex items-center text-gray-500 hover:text-white"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                            </svg>
-                                        </button>
-                                    )}
                                 </div>
                                 
-                                {isCategoryDropdownOpen && (categoryFilter || filteredCategoryOptions.length > 0) && !selectedCategory && (
+                                {isCategoryDropdownOpen && (categoryFilter || filteredCategoryOptions.length > 0) && selectedCategories.length < 3 && (
                                     <div className="absolute top-full mt-2 w-full glass-panel border border-white/10 rounded-xl overflow-hidden shadow-xl z-50 max-h-60 overflow-y-auto">
                                         <ul role="listbox">
                                             {filteredCategoryOptions.length > 0 ? (
                                                 filteredCategoryOptions.map(cat => (
-                                                    <li key={cat}>
+                                                    <li key={cat.id}>
                                                         <button
                                                             onClick={() => {
-                                                                setSelectedCategory(cat);
-                                                                setCategoryFilter('');
-                                                                setIsCategoryDropdownOpen(false);
+                                                                if (selectedCategories.length < 3) {
+                                                                    setSelectedCategories([...selectedCategories, cat]);
+                                                                    setCategoryFilter('');
+                                                                    setIsCategoryDropdownOpen(false);
+                                                                }
                                                             }}
                                                             className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
                                                         >
-                                                            {cat}
+                                                            {cat.name}
                                                         </button>
                                                     </li>
                                                 ))
@@ -307,6 +346,26 @@ const Dashboard: React.FC = () => {
                                                 <li className="px-4 py-2 text-sm text-gray-500">No categories found</li>
                                             )}
                                         </ul>
+                                    </div>
+                                )}
+
+                                {/* Selected Categories Chips */}
+                                {selectedCategories.length > 0 && (
+                                    <div className="absolute top-full left-0 mt-2 flex flex-wrap gap-2 max-w-sm">
+                                        {selectedCategories.map(cat => (
+                                            <span key={cat.id} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/20 text-primary border border-primary/30 z-10">
+                                                {cat.name}
+                                                <button
+                                                    onClick={() => setSelectedCategories(selectedCategories.filter(c => c.id !== cat.id))}
+                                                    className="ml-1.5 h-3.5 w-3.5 rounded-full inline-flex items-center justify-center hover:bg-primary/30 focus:outline-none"
+                                                >
+                                                    <span className="sr-only">Remove {cat.name}</span>
+                                                    <svg className="h-2.5 w-2.5" stroke="currentColor" fill="none" viewBox="0 0 8 8">
+                                                        <path strokeLinecap="round" strokeWidth="1.5" d="M1 1l6 6m0-6L1 7" />
+                                                    </svg>
+                                                </button>
+                                            </span>
+                                        ))}
                                     </div>
                                 )}
                             </div>
