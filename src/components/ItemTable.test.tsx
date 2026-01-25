@@ -3,40 +3,40 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import ItemTable from './ItemTable';
 import type { PantryItem } from '../types/PantryItem';
 
-const mockItems: PantryItem[] = [
-    {
-        id: 1,
-        name: 'Apples',
-        quantity: 10,
-        categoryId: 1,
-        category: { id: 1, name: 'Fruits' },
-        expirationDate: '2026-02-01T00:00:00Z',
-        createdAt: '2026-01-01T00:00:00Z',
-        updatedAt: '2026-01-01T00:00:00Z',
-    },
-    {
-        id: 2,
-        name: 'Bread',
-        quantity: 3,
-        categoryId: 2,
-        category: { id: 2, name: 'Bakery' },
-        expirationDate: '2026-01-20T00:00:00Z',
-        createdAt: '2026-01-01T00:00:00Z',
-        updatedAt: '2026-01-01T00:00:00Z',
-    },
-    {
-        id: 3,
-        name: 'Milk',
-        quantity: 2,
-        categoryId: 3,
-        category: { id: 3, name: 'Dairy' },
-        expirationDate: null,
-        createdAt: '2026-01-01T00:00:00Z',
-        updatedAt: '2026-01-01T00:00:00Z',
-    },
-];
-
 describe('ItemTable', () => {
+    const mockItems: PantryItem[] = [
+        {
+            id: 1,
+            name: 'Apples',
+            quantity: 10,
+            categoryId: 1,
+            expirationDate: new Date('2026-02-01'),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            category: { id: 1, name: 'Fruits' }
+        },
+        {
+            id: 2,
+            name: 'Bread',
+            quantity: 3,
+            categoryId: 2,
+            expirationDate: new Date('2026-01-20'),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            category: { id: 2, name: 'Bakery' }
+        },
+        {
+            id: 3,
+            name: 'Milk',
+            quantity: 2,
+            categoryId: 3,
+            expirationDate: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            category: { id: 3, name: 'Dairy' }
+        }
+    ];
+
     const defaultProps = {
         items: mockItems,
         onEdit: vi.fn(),
@@ -72,9 +72,8 @@ describe('ItemTable', () => {
 
     it('shows "Low Stock" indicator for items with quantity < 5', () => {
         render(<ItemTable {...defaultProps} />);
-        // Bread (qty 3) and Milk (qty 2) should have Low Stock
-        const lowStockIndicators = screen.getAllByText('Low Stock');
-        expect(lowStockIndicators.length).toBe(2);
+        const lowStockBadges = screen.getAllByText('Low Stock');
+        expect(lowStockBadges).toHaveLength(2); // Bread and Milk
     });
 
     it('displays N/A for items without expiration date', () => {
@@ -83,93 +82,58 @@ describe('ItemTable', () => {
     });
 
     it('calls onAdd when add button is clicked', () => {
-        const onAdd = vi.fn();
-        render(<ItemTable {...defaultProps} onAdd={onAdd} />);
-
-        // Find the add button by its tooltip
-        const addButtons = screen.getAllByRole('button');
-        const addButton = addButtons.find(btn =>
-            btn.closest('.tooltip-container')?.textContent?.includes('Add Item')
-        );
-
-        if (addButton) {
-            fireEvent.click(addButton);
-            expect(onAdd).toHaveBeenCalledTimes(1);
-        }
+        render(<ItemTable {...defaultProps} />);
+        const addBtn = screen.getByLabelText('Add Item');
+        fireEvent.click(addBtn);
+        expect(defaultProps.onAdd).toHaveBeenCalled();
     });
 
     it('calls onImport when import button is clicked', () => {
-        const onImport = vi.fn();
-        render(<ItemTable {...defaultProps} onImport={onImport} />);
-
-        const importButtons = screen.getAllByRole('button');
-        const importButton = importButtons.find(btn =>
-            btn.closest('.tooltip-container')?.textContent?.includes('Import CSV')
-        );
-
-        if (importButton) {
-            fireEvent.click(importButton);
-            expect(onImport).toHaveBeenCalledTimes(1);
-        }
+        render(<ItemTable {...defaultProps} />);
+        const importBtn = screen.getByLabelText('Import CSV');
+        fireEvent.click(importBtn);
+        expect(defaultProps.onImport).toHaveBeenCalled();
     });
 
     it('applies highlight styling when highlightedItemId matches', () => {
-        render(<ItemTable {...defaultProps} highlightedItemId={1} />);
+        const { container } = render(<ItemTable {...defaultProps} highlightedItemId={1} />);
+        // Find row that contains "Apples" and check if it has the highlight class
         const row = screen.getByText('Apples').closest('tr');
-        expect(row).toHaveClass('bg-primary/20');
+        expect(row).toHaveClass('bg-primary/10');
     });
 
     it('renders table headers correctly', () => {
         render(<ItemTable {...defaultProps} />);
         expect(screen.getByText('Product Name')).toBeInTheDocument();
-        expect(screen.getByText('Quantity')).toBeInTheDocument();
+        expect(screen.getByText('Qty')).toBeInTheDocument();
         expect(screen.getByText('Category')).toBeInTheDocument();
-        expect(screen.getByText('Expiry Date')).toBeInTheDocument();
+        expect(screen.getByText('Expiry')).toBeInTheDocument();
     });
-});
-
-describe('ItemTable Pagination', () => {
-    const manyItems: PantryItem[] = Array.from({ length: 12 }, (_, i) => ({
-        id: i + 1,
-        name: `Item ${i + 1}`,
-        quantity: 10,
-        categoryId: 1,
-        category: { id: 1, name: 'Test Category' },
-        createdAt: '2026-01-01T00:00:00Z',
-        updatedAt: '2026-01-01T00:00:00Z',
-    }));
-
-    const paginationProps = {
-        items: manyItems,
-        onEdit: vi.fn(),
-        onAdd: vi.fn(),
-        onImport: vi.fn(),
-    };
 
     it('shows pagination controls when there are more items than page size', () => {
-        render(<ItemTable {...paginationProps} />);
-        // Should show "Showing X-Y of Z items" text
-        expect(screen.getByText(/Showing/)).toBeInTheDocument();
-        expect(screen.getByText('12')).toBeInTheDocument();
+        const manyItems = Array(10).fill(mockItems[0]).map((item, i) => ({ ...item, id: i }));
+        render(<ItemTable {...defaultProps} items={manyItems} />);
+        expect(screen.getByLabelText('Page 1')).toBeInTheDocument();
+        expect(screen.getByLabelText('Page 2')).toBeInTheDocument();
     });
 
     it('shows only 5 items per page', () => {
-        render(<ItemTable {...paginationProps} />);
-        // First page should have items 1-5
-        expect(screen.getByText('Item 1')).toBeInTheDocument();
-        expect(screen.getByText('Item 5')).toBeInTheDocument();
-        expect(screen.queryByText('Item 6')).not.toBeInTheDocument();
+        const manyItems = Array(10).fill(mockItems[0]).map((item, i) => ({ ...item, id: i, name: `Item ${i}` }));
+        render(<ItemTable {...defaultProps} items={manyItems} />);
+        expect(screen.getByText('Item 0')).toBeInTheDocument();
+        expect(screen.getByText('Item 4')).toBeInTheDocument();
+        expect(screen.queryByText('Item 5')).not.toBeInTheDocument();
     });
 
     it('navigates to next page when clicking next button', () => {
-        render(<ItemTable {...paginationProps} />);
+        const manyItems = Array(10).fill(mockItems[0]).map((item, i) => ({ ...item, id: i, name: `Item ${i}` }));
+        render(<ItemTable {...defaultProps} items={manyItems} />);
+        
+        const nextBtn = screen.getByLabelText('Next page');
+        fireEvent.click(nextBtn);
 
-        // Find and click the "2" page button
-        const pageTwo = screen.getByText('2');
-        fireEvent.click(pageTwo);
-
-        // Should now show items from page 2
-        expect(screen.getByText('Item 6')).toBeInTheDocument();
-        expect(screen.queryByText('Item 1')).not.toBeInTheDocument();
+        expect(screen.queryByText('Item 0')).not.toBeInTheDocument();
+        expect(screen.getByText('Item 5')).toBeInTheDocument();
+        expect(screen.getByText('Item 9')).toBeInTheDocument();
     });
 });

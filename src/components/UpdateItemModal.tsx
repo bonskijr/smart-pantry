@@ -20,15 +20,18 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
     const [quantity, setQuantity] = useState(1);
     const [categoryId, setCategoryId] = useState<number | ''>('');
     const [expirationDate, setExpirationDate] = useState('');
-    
+
     const { categories, fetchCategories, createCategory } = useCategories();
-    
+
     // New Category State
     const [isNewCategory, setIsNewCategory] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
-    
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Internal state for custom confirmation dialog
+    const [showConfirmClose, setShowConfirmClose] = useState(false);
 
     useEffect(() => {
         if (isOpen && item) {
@@ -38,9 +41,44 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
             setExpirationDate(item.expirationDate ? new Date(item.expirationDate).toISOString().split('T')[0] : '');
             setIsNewCategory(false);
             setNewCategoryName('');
+            setShowConfirmClose(false);
             fetchCategories();
         }
     }, [isOpen, item, fetchCategories]);
+
+    // Track if form has unsaved changes (compare against original item values)
+    const isDirty = item ? (
+        name !== item.name ||
+        quantity !== item.quantity ||
+        categoryId !== item.categoryId ||
+        expirationDate !== (item.expirationDate ? new Date(item.expirationDate).toISOString().split('T')[0] : '') ||
+        newCategoryName !== ''
+    ) : false;
+
+    // Handle ESC key press
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (showConfirmClose) {
+                     // If confirm dialog is open, ESC cancels closing (keeps editing)
+                    setShowConfirmClose(false);
+                    return;
+                }
+
+                if (isDirty) {
+                    setShowConfirmClose(true);
+                } else {
+                    onClose();
+                }
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, isDirty, onClose, showConfirmClose]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -53,12 +91,12 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
             let finalCategoryId = categoryId;
 
             if (isNewCategory) {
-                 if (!newCategoryName.trim()) {
-                     throw new Error('Category name is required');
-                 }
-                 finalCategoryId = await createCategory(newCategoryName);
+                if (!newCategoryName.trim()) {
+                    throw new Error('Category name is required');
+                }
+                finalCategoryId = await createCategory(newCategoryName);
             } else if (!categoryId) {
-                 throw new Error('Please select a category');
+                throw new Error('Please select a category');
             }
 
             const response = await fetch(`${ENDPOINTS.ITEMS}/${item.id}`, {
@@ -82,10 +120,10 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
             }
 
             const updatedItem = await response.json();
-            
+
             let category = categories.find(c => c.id === finalCategoryId);
             if (!category && isNewCategory) {
-                 category = { id: finalCategoryId as number, name: newCategoryName };
+                category = { id: finalCategoryId as number, name: newCategoryName };
             }
 
             onItemUpdated({ ...updatedItem, category });
@@ -101,16 +139,43 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
 
     return (
         <div className="fixed inset-0 backdrop-blur-sm bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="glass-panel rounded-3xl shadow-2xl w-full max-w-md overflow-hidden ring-1 ring-white/10">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200 relative">
+                 {/* Custom Confirmation Overlay */}
+                 {showConfirmClose && (
+                    <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center animate-fadeIn">
+                         <div className="w-16 h-16 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">Unsaved Changes</h3>
+                        <p className="text-gray-500 mb-6">You have modified this item. Are you sure you want to close?</p>
+                        <div className="flex gap-3 w-full">
+                            <button
+                                onClick={() => setShowConfirmClose(false)}
+                                className="flex-1 px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold transition-all"
+                            >
+                                Keep Editing
+                            </button>
+                            <button
+                                onClick={onClose}
+                                className="flex-1 px-4 py-3 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 font-semibold transition-all border border-red-200"
+                            >
+                                Discard & Close
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 <div className="px-8 py-8">
                     <div className="flex justify-between items-center mb-8">
                         <div>
-                            <h2 className="text-2xl font-bold text-white tracking-tight">Edit Item</h2>
-                            <p className="text-gray-400 text-sm mt-1">Update the details of your pantry item.</p>
+                            <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Edit Item</h2>
+                            <p className="text-gray-500 text-sm mt-1">Update the details of your pantry item.</p>
                         </div>
                         <button
-                            onClick={onClose}
-                            className="p-2 rounded-xl hover:bg-white/5 text-gray-400 hover:text-white transition-all ring-1 ring-transparent hover:ring-white/10"
+                            onClick={() => isDirty ? setShowConfirmClose(true) : onClose()}
+                            className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -136,7 +201,7 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     required
-                                    className="w-full bg-white/[0.03] border border-white/5 hover:border-primary/50 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all placeholder:text-gray-600"
+                                    className="w-full bg-gray-50 border border-gray-200 hover:border-primary/50 text-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all placeholder:text-gray-400"
                                 />
                             </div>
 
@@ -149,26 +214,26 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
                                         onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
                                         min={1}
                                         required
-                                        className="w-full bg-white/[0.03] border border-white/5 hover:border-primary/50 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                        className="w-full bg-gray-50 border border-gray-200 hover:border-primary/50 text-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                                     />
                                 </div>
 
                                 <div>
                                     <div className="flex justify-between items-center mb-1.5 ml-1">
                                         <label className="block text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest">Category</label>
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             onClick={() => {
                                                 setIsNewCategory(!isNewCategory);
                                                 setNewCategoryName('');
                                                 setCategoryId('');
                                             }}
-                                            className="text-[0.65rem] text-primary hover:text-white transition-colors uppercase font-bold tracking-wider"
+                                            className="text-[0.65rem] text-primary hover:text-primary-hover transition-colors uppercase font-bold tracking-wider"
                                         >
                                             {isNewCategory ? 'Select Existing' : 'Create New'}
                                         </button>
                                     </div>
-                                    
+
                                     {isNewCategory ? (
                                         <input
                                             type="text"
@@ -176,18 +241,18 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
                                             onChange={(e) => setNewCategoryName(e.target.value)}
                                             required={isNewCategory}
                                             placeholder="New Category Name"
-                                            className="w-full bg-white/[0.03] border border-white/5 hover:border-primary/50 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all placeholder:text-gray-600"
+                                            className="w-full bg-gray-50 border border-gray-200 hover:border-primary/50 text-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all placeholder:text-gray-400"
                                         />
                                     ) : (
                                         <select
                                             value={categoryId}
                                             onChange={(e) => setCategoryId(Number(e.target.value) || '')}
                                             required={!isNewCategory}
-                                            className="w-full bg-white/[0.03] border border-white/5 hover:border-primary/50 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer"
+                                            className="w-full bg-gray-50 border border-gray-200 hover:border-primary/50 text-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer"
                                         >
-                                            <option value="" className="bg-surface">Select</option>
+                                            <option value="" className="bg-white">Select</option>
                                             {categories.map((cat) => (
-                                                <option key={cat.id} value={cat.id} className="bg-surface">
+                                                <option key={cat.id} value={cat.id} className="bg-white">
                                                     {cat.name}
                                                 </option>
                                             ))}
@@ -202,7 +267,7 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
                                     type="date"
                                     value={expirationDate}
                                     onChange={(e) => setExpirationDate(e.target.value)}
-                                    className="w-full bg-white/[0.03] border border-white/5 hover:border-primary/50 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all [color-scheme:dark]"
+                                    className="w-full bg-gray-50 border border-gray-200 hover:border-primary/50 text-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                                 />
                             </div>
                         </div>
@@ -210,8 +275,8 @@ const UpdateItemModal: React.FC<UpdateItemModalProps> = ({ isOpen, onClose, onIt
                         <div className="flex gap-3 pt-4">
                             <button
                                 type="button"
-                                onClick={onClose}
-                                className="flex-1 px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold transition-all ring-1 ring-white/10 hover:ring-white/20"
+                                onClick={() => isDirty ? setShowConfirmClose(true) : onClose()}
+                                className="flex-1 px-6 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold transition-all"
                             >
                                 Cancel
                             </button>

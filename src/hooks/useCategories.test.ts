@@ -22,7 +22,7 @@ describe('useCategories', () => {
         });
 
         const { result } = renderHook(() => useCategories());
-        
+
         await result.current.fetchCategories();
 
         await waitFor(() => {
@@ -42,17 +42,18 @@ describe('useCategories', () => {
 
         const { result } = renderHook(() => useCategories());
 
-        let id;
+        let id: number | undefined;
         await waitFor(async () => {
-             id = await result.current.createCategory('NewCat');
+            id = await result.current.createCategory('NewCat');
         });
 
         expect(id).toBe(99);
-        // Note: Using ENDPOINTS import in test file requires handling, but here we mock fetch global so we don't care about the URL value in source as long as logic calls fetch.
-        // But if we want to assert URL:
-        // expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/categories'), ...);
-        
-        expect(result.current.categories).toHaveLength(1);
+
+        // Wait for the state update to complete
+        await waitFor(() => {
+            expect(result.current.categories).toHaveLength(1);
+        });
+
         expect(result.current.categories[0]).toEqual({ id: 99, name: 'NewCat' });
     });
 });

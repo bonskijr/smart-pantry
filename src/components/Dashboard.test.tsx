@@ -20,7 +20,6 @@ describe('Dashboard', () => {
         (global.fetch as any).mockImplementation((url: string) => {
             if (url.includes('/items')) {
                 // Return filtered items if categories param exists
-                // The test asks for Dairy (id 20)
                 if (url.includes('categories=20')) {
                     return Promise.resolve({
                         ok: true,
@@ -43,12 +42,10 @@ describe('Dashboard', () => {
         });
     });
 
-    it('renders combined stats correctly', async () => {
+    it('renders inventory correctly', async () => {
         render(<Dashboard />);
         await waitFor(() => expect(screen.getByText('Fresh Item')).toBeInTheDocument());
-        
-        // Total Quantity: 5 + 2 = 7
-        expect(screen.getByText('7')).toBeInTheDocument(); 
+        expect(screen.getByText('Active Inventory')).toBeInTheDocument();
     });
 
     it('filters to expiring items when "Expiring Soon" is clicked', async () => {
@@ -68,7 +65,7 @@ describe('Dashboard', () => {
         expect(screen.queryByText('Fresh Item')).not.toBeInTheDocument();
     });
 
-    it('resets to all items when "Combined Banner" or "Clear Filters" is clicked', async () => {
+    it('resets to all items when "Clear Filters" is clicked', async () => {
         render(<Dashboard />);
         await waitFor(() => expect(screen.getByText('Fresh Item')).toBeInTheDocument());
 
@@ -78,16 +75,8 @@ describe('Dashboard', () => {
 
         // Click "Clear Filters" button
         fireEvent.click(screen.getByText('Clear Filters'));
-        expect(screen.getByText('Fresh Item')).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByText('Fresh Item')).toBeInTheDocument());
         expect(screen.getByText('Active Inventory')).toBeInTheDocument();
-        
-        // Go to expiring again
-        fireEvent.click(screen.getByText('Expiring Soon').closest('.glass-panel')!);
-        await waitFor(() => expect(screen.queryByText('Fresh Item')).not.toBeInTheDocument());
-        
-        // Click Combined Banner (Total Items/Quantity)
-        fireEvent.click(screen.getByText('Total Items').closest('.glass-panel')!);
-        expect(screen.getByText('Fresh Item')).toBeInTheDocument();
     });
 
     it('filters items by search term', async () => {

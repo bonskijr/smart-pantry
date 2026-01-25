@@ -21,9 +21,11 @@ describe('AddItemModal', () => {
         });
     });
 
-    it('renders correctly when open', () => {
+    it('renders correctly when open', async () => {
         render(<AddItemModal {...defaultProps} />);
         expect(screen.getByText('Add New Item')).toBeInTheDocument();
+        // Wait for effect to run to avoid act warnings
+        await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     });
 
     it('does not render when closed', () => {
@@ -31,8 +33,9 @@ describe('AddItemModal', () => {
         expect(screen.queryByText('Add New Item')).not.toBeInTheDocument();
     });
 
-    it('toggles new category input', () => {
+    it('toggles new category input', async () => {
         render(<AddItemModal {...defaultProps} />);
+        await waitFor(() => expect(global.fetch).toHaveBeenCalled());
         
         const toggleBtn = screen.getByText('Create New');
         fireEvent.click(toggleBtn);
@@ -61,6 +64,7 @@ describe('AddItemModal', () => {
             });
 
         render(<AddItemModal {...defaultProps} />);
+        await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1)); // Wait for initial fetch
         
         // Switch to new category
         const toggleBtn = screen.getByText('Create New');
@@ -95,8 +99,9 @@ describe('AddItemModal', () => {
         expect(defaultProps.onClose).toHaveBeenCalled();
     });
 
-    it('resets form when reopened', () => {
+    it('resets form when reopened', async () => {
         const { rerender } = render(<AddItemModal {...defaultProps} />);
+        await waitFor(() => expect(global.fetch).toHaveBeenCalled());
         
         fireEvent.change(screen.getByPlaceholderText('Enter item name'), { target: { value: 'Test Name' } });
         expect(screen.getByPlaceholderText('Enter item name')).toHaveValue('Test Name');
@@ -106,6 +111,7 @@ describe('AddItemModal', () => {
         
         // Open
         rerender(<AddItemModal {...defaultProps} isOpen={true} />);
+        await waitFor(() => expect(global.fetch).toHaveBeenCalled()); // Fetch happens again on reopen
         
         expect(screen.getByPlaceholderText('Enter item name')).toHaveValue('');
     });
@@ -128,6 +134,7 @@ describe('AddItemModal', () => {
             });
 
         render(<AddItemModal {...defaultProps} />);
+        await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
         
         fireEvent.change(screen.getByPlaceholderText('Enter item name'), { target: { value: 'Item' } });
         fireEvent.click(screen.getByText('Create New'));

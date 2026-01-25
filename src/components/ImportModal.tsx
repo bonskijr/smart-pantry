@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ENDPOINTS } from '../config';
 
 interface ImportResult {
@@ -85,6 +85,38 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onItemsImpor
             setLoading(false);
         }
     };
+
+    // Handle ESC key press
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // If file is selected but not yet processed (result is null), consider it dirty
+                const isDirty = !!file && !result;
+
+                if (isDirty) {
+                    if (window.confirm('You have selected a file. Are you sure you want to close?')) {
+                        onClose();
+                        setFile(null); // Reset on close
+                        setError(null);
+                    }
+                } else {
+                    onClose();
+                    // Optional: reset state if desired, but parent likely handles isOpen toggle which might not unmount
+                    if (result) {
+                        setFile(null);
+                        setResult(null);
+                        setError(null);
+                    }
+                }
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, file, result, onClose]);
 
     if (!isOpen) return null;
 

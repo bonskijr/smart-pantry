@@ -12,8 +12,7 @@ The schema defines `Category` and `PantryItem` with a clear one-to-many relation
 ### 🔍 Issues & Observations
 - **Missing Database Defaults:** The `id` fields are `String @id` without `@default(uuid())` or `@default(cuid())`. This forces the application layer to generate IDs (currently using `uuidv7` in code), which is less robust than letting the database handle it.
 - **Lack of Indexes:** There are no explicit indexes on `categoryId` or `expirationDate`. As the `PantryItem` table grows, queries filtering by category or sorting by expiration will degrade in performance.
-- **Missing URL in Schema:** `prisma/schema.prisma` is miI have completed the code review for the SmartPantry project. The analysis identified several areas for improvement, including optimizing the bulk import logic to prevent "N+1" database calls, enhancing type safety between the frontend and Prisma, and adding missing database indexes for better performance. Detailed findings and actionable recommendations, including T-SQL comparisons for your reference, have been documented in `smartpantry-review.md`.
-ex Seek` during joins.
+- **Missing URL in Schema:** `prisma/schema.prisma` is missing the datasource URL.
 
 ---
 
@@ -69,7 +68,16 @@ The API URL `http://localhost:3000` is hardcoded in `Dashboard.tsx`.
 
 ---
 
-## 4. Actionable Recommendations Summary
+## 4. UI/UX & Interactions (Needs Improvement)
+
+### ⚠️ Modal Confirmation Logic
+The custom confirmation overlay implemented in `AddItemModal` and `UpdateItemModal` prevents data loss on accidental `Esc` key presses.
+- **Current State:** Functional "discard/keep" logic exists.
+- **Improvement Needed:** The UI for this overlay is currently basic ("good enough"). It needs visual refinement, better typography, and perhaps a more integrated animation to feel like a premium part of the application dashboard.
+
+---
+
+## 5. Actionable Recommendations Summary
 
 1. **Schema Optimization:**
    - Add `@default(uuid())` to IDs.
@@ -78,3 +86,4 @@ The API URL `http://localhost:3000` is hardcoded in `Dashboard.tsx`.
 3. **Enhance Type Safety:** Sync the frontend `PantryItem` type with the Prisma relation structure.
 4. **Implement Delete:** Add the missing DELETE endpoint and UI button.
 5. **Validation Layer:** Introduce Zod for both Frontend forms and Backend API requests.
+6. **Refine UI/UX:** Polish the modal confirmation overlays and general aesthetic consistency.
